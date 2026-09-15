@@ -20,11 +20,15 @@ import json
 import random
 import re
 import time
+from contextvars import ContextVar
 from typing import Any, Sequence, Type, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
 from aip import cache, cost, tracing
+
+repair_attempts: ContextVar[int] = ContextVar("structured_repair_attempts", default=0)
+model_latency_ms: ContextVar[float] = ContextVar("model_latency_ms", default=0.0)
 from aip.config import resolve_model, settings
 
 T = TypeVar("T", bound=BaseModel)
@@ -93,6 +97,7 @@ def raw_call(
 
     hit = cache.get(key)
     if hit is not None:
+        model_latency_ms.set(model_latency_ms.get() + hit["usage"].get("latency_ms", 0.0))
         usage = cost.Usage(
             model=model,
             prompt_tokens=hit["usage"]["prompt_tokens"],
@@ -157,6 +162,7 @@ def raw_call(
             raise last_exc  # type: ignore[misc]
 
         latency_ms = (time.perf_counter() - t0) * 1000
+        model_latency_ms.set(model_latency_ms.get() + latency_ms)
         choice = resp.choices[0]
         text = choice.message.content or ""
         tool_calls = [
@@ -336,6 +342,8 @@ def structured(
         except (ValidationError, ValueError) as exc:
             errors = str(exc)[:2000]
             tracing.event("structured.repair", attempt=attempt + 1, error=errors[:300])
+            if attempt < max_repairs:
+                repair_attempts.set(repair_attempts.get() + 1)
             if attempt == max_repairs:
                 break
             messages = [

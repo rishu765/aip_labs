@@ -264,3 +264,39 @@ def test_unpriced_models_are_not_reported_as_free():
     assert b.unpriced_calls == 1
     assert "UNPRICED" in b.report()
     assert b.as_dict()["unpriced_calls"] == 1
+
+
+# --- lab 1 deterministic extraction ----------------------------------------
+def test_lab1_policy_number_ignores_quoted_history():
+    from labs.lab1.extract import extract_deterministic
+
+    ticket = (
+        "Please explain my claim status.\n\n"
+        "> Old thread had policy AUR-1111111\n"
+        "> Please ignore old context."
+    )
+    assert extract_deterministic(ticket)["policy_number"] is None
+
+
+def test_lab1_policy_number_uses_live_message_before_quote():
+    from labs.lab1.extract import extract_deterministic
+
+    ticket = "My policy AUR-2222222 upload is failing.\n\n> Old policy AUR-1111111"
+    assert extract_deterministic(ticket)["policy_number"] == "AUR-2222222"
+
+
+def test_lab1_pii_excludes_aurora_addresses_but_counts_customer_contact():
+    from labs.lab1.extract import extract_deterministic
+
+    own_only = "Aurora Support <support@aurorahealth.example> replied."
+    customer_contact = "Call me at 9876543210 or me@example.com."
+    assert extract_deterministic(own_only)["contains_pii"] is False
+    assert extract_deterministic(customer_contact)["contains_pii"] is True
+
+
+def test_lab1_business_rules_escalate():
+    from labs.lab1.extract import apply_business_rules
+
+    assert apply_business_rules({"urgency": 4}, "ordinary text")["escalate"] is True
+    assert apply_business_rules({"urgency": 2}, "I am going to Ombudsman")["escalate"] is True
+    assert apply_business_rules({"urgency": 2}, "ordinary text")["escalate"] is False

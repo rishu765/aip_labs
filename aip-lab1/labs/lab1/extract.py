@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Lab 1, Parts B and C — the extractor you actually ship.
-
-Complete the TODOs. `run_eval.py` imports `extract_b` and `extract_c` from
-here, so keep those two function names.
-"""
+"""Lab 1, Parts B and C - the extractor you actually ship."""
 from __future__ import annotations
 
+import html
 import re
 import sys
 from pathlib import Path
@@ -18,58 +15,90 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from aip.guards import _PII_PATTERNS  # noqa: E402
 from aip.llm import StructuredOutputError, structured  # noqa: E402
 
-CATEGORIES = Literal["billing", "claims", "policy_change",
-                     "technical", "complaint", "information"]
+CATEGORIES = Literal[
+    "billing",
+    "claims",
+    "policy_change",
+    "technical",
+    "complaint",
+    "information",
+]
+
+POLICY_RE = re.compile(r"\bAUR-\d{7}\b")
+QUOTE_MARKER = re.compile(r"^\s*>", re.MULTILINE)
+OWN_EMAILS = {"support@aurorahealth.example", "grievance@aurorahealth.example"}
+
+CATEGORY_DESCRIPTION = (
+    "Choose one: billing=payments, premiums, debits, refunds, invoices, tax "
+    "certificate; claims=actual or intended cashless/reimbursement/settlement/"
+    "deduction/rejection; policy_change=add/remove member, upgrade, port, "
+    "contact change; technical=app, portal, OTP, login, locator, upload broken; "
+    "complaint=Aurora conduct such as mis-selling, hold time, ignored grievance; "
+    "information=general question with no pending transaction. Angry claim "
+    "requests are claims, not complaint."
+)
+
+URGENCY_DESCRIPTION = (
+    "1=general knowledge/self-service, no account lookup. 2=look up this "
+    "customer, act, fix a defect, or transaction in flight. 3=something already "
+    "went wrong or is stuck and customer waits. 4=repeated failure, money/access "
+    "at risk now, or explicit escalation threat. 5=emergency, formal denial "
+    "needing immediate reversal, or customer is filing with Ombudsman. Add 1, "
+    "capped at 5, for same-day/next-morning deadline."
+)
+
+SENTIMENT_DESCRIPTION = (
+    "Tone only: angry=hostile, shouting, threatening; frustrated=unhappy after "
+    "prior failure/delay/repeat attempt, still civil; neutral=matter-of-fact "
+    "first-time request; satisfied=thanks or praise."
+)
+
+PRODUCT_DESCRIPTION = (
+    "Return bronze, silver, gold, or platinum only when the plan is named in "
+    "the ticket. Never infer from sum insured or context; use unknown when no "
+    "plan name appears."
+)
+
+LANGUAGE_DESCRIPTION = (
+    "Return hi-en when Hindi words are mixed into English, including "
+    "transliterated Hindi such as kripya, jaldi, bahut, turant; otherwise en."
+)
 
 
-# ===========================================================================
-# PART B — the schema
-# ===========================================================================
 class TicketRecord(BaseModel):
-    """The contract. Everything the model is allowed to say, and nothing else.
+    """Part B schema: the model decides all graded fields except escalation."""
 
-    Remember from T2 §3.2: field `description`s are shipped to the model as
-    part of the JSON Schema. They are the highest-leverage place to put an
-    instruction, because they sit next to the thing they govern. Write them as
-    instructions to the model, not as documentation for a human.
-    """
-
-    # TODO B1a: Should `evidence` be declared here, BEFORE the fields it
-    #           justifies, or after them? T2 §3.3. Decide, move it, and leave
-    #           a one-line comment saying which effect you chose and why.
-
-    category: CATEGORIES = Field(
-        description="TODO B1b: define each of the six categories in one clause "
-                    "each. Pay particular attention to the boundary between "
-                    "'complaint' and the category the complaint is about."
+    # Evidence comes first so the model grounds the judgement before choosing
+    # the category that the evidence supports.
+    evidence: str = Field(
+        max_length=200,
+        description="Quote the shortest verbatim span that determines category.",
     )
-
-    urgency: int = Field(
-        ge=1, le=5,
-        description="TODO B1c: define the 1-5 scale concretely. Anchor at least "
-                    "points 1, 3 and 5 with a describable situation. If you do "
-                    "not define the scale, the model invents one, and it will "
-                    "not be the one the gold labels use."
+    category: CATEGORIES = Field(description=CATEGORY_DESCRIPTION)
+    urgency: int = Field(ge=1, le=5, description=URGENCY_DESCRIPTION)
+    sentiment: Literal["angry", "frustrated", "neutral", "satisfied"] = Field(
+        description=SENTIMENT_DESCRIPTION
     )
-
-    # TODO B1d: sentiment  -> Literal["angry","frustrated","neutral","satisfied"]
-    # TODO B1e: product    -> Literal["bronze","silver","gold","platinum","unknown"]
-    #           Note "unknown" is a legal value. Say explicitly when to use it.
-    # TODO B1f: language   -> Literal["en","hi-en"]
-    # TODO B1g: evidence   -> str, max_length=200, "the span of the ticket that
-    #           determined the category, quoted verbatim"
-
-    # Part B only: the model decides these. In Part C you will delete them
-    # from this schema and compute them in code instead.
+    product: Literal["bronze", "silver", "gold", "platinum", "unknown"] = Field(
+        description=PRODUCT_DESCRIPTION
+    )
+    language: Literal["en", "hi-en"] = Field(description=LANGUAGE_DESCRIPTION)
     policy_number: str | None = Field(
         default=None,
-        description="TODO B1h: state the exact format, and state explicitly "
-                    "that null is required when no policy number appears. "
-                    "Forbid inventing or reformatting one."
+        pattern=r"^AUR-\d{7}$",
+        description=(
+            "Copy an exact policy number only if it appears as AUR- followed by "
+            "7 digits. Return null when absent. Never invent, reformat, or copy "
+            "from quoted reply history."
+        ),
     )
     contains_pii: bool = Field(
         default=False,
-        description="TODO B1i"
+        description=(
+            "True if the ticket contains a phone number or non-Aurora email "
+            "address. Names alone do not count; support@aurorahealth.example and "
+            "grievance@aurorahealth.example do not count."
+        ),
     )
 
     # Set by our code, never by the model.
@@ -79,93 +108,212 @@ class TicketRecord(BaseModel):
     @field_validator("policy_number")
     @classmethod
     def _policy_format(cls, v: str | None) -> str | None:
-        # TODO B1j: reject anything that is not exactly AUR-<7 digits>.
-        #           Return None rather than raising if the model returned an
-        #           empty string or the literal "null" -- decide which of those
-        #           two behaviours you want and defend it in your report.
+        # Empty strings and literal "null" are treated as absent; anything else
+        # malformed is rejected so the repair loop can fix it.
+        if v is None:
+            return None
+        if v.strip().lower() in {"", "null", "none"}:
+            return None
+        if not POLICY_RE.fullmatch(v):
+            raise ValueError("policy_number must be exactly AUR- followed by 7 digits")
         return v
 
 
 SYSTEM_PROMPT = """\
-TODO B2: write this using the seven-component structure from T2 §2.
-
-Order it for attention AND for prompt caching: stable instructions first,
-volatile data last. The ticket text is injected by the caller, after this.
-
-It should be shorter than your first instinct. Most of what you want to say
-belongs in the field descriptions above.
+Role: You are Aurora Health's support-ticket extraction service.
+Task: Convert one raw support ticket into the requested structured record.
+Audience: The record is used by routing, compliance review, and evaluation.
+Source policy: Use only text present in the ticket; do not infer hidden facts.
+Decision policy: Follow the JSON Schema field descriptions exactly.
+Reliability: If uncertain, choose the closest valid value and brief evidence.
+Output: Return only the JSON object requested by the schema.
 """
+
+
+def _fallback_b(reason: str) -> TicketRecord:
+    heuristic = _heuristic_judgements("")
+    return TicketRecord(
+        evidence="",
+        category=heuristic["category"],
+        urgency=heuristic["urgency"],
+        sentiment=heuristic["sentiment"],
+        product="unknown",
+        language="en",
+        policy_number=None,
+        contains_pii=False,
+        needs_human_review=True,
+        review_reason=reason[:200],
+    )
 
 
 def extract_b(ticket: str) -> TicketRecord:
     """Part B: the model decides everything."""
-    # TODO B3: call aip.llm.structured with TicketRecord.
-    # TODO B4: catch StructuredOutputError and return a record with
-    #          needs_human_review=True. This function must never raise.
-    raise NotImplementedError
+    try:
+        return structured(
+            f"Ticket:\n{ticket}",
+            schema=TicketRecord,
+            system=SYSTEM_PROMPT,
+            tier="SMALL",
+            temperature=0.0,
+            max_tokens=900,
+        )
+    except (StructuredOutputError, Exception) as exc:
+        return _fallback_b(str(exc))
 
 
-# ===========================================================================
-# PART C — move the deterministic work out of the model
-# ===========================================================================
-POLICY_RE = re.compile(r"\bAUR-\d{7}\b")
+def _live_message(ticket: str) -> str:
+    live = QUOTE_MARKER.split(ticket, maxsplit=1)[0]
+    return re.split(
+        r"(?im)^\s*(?:--|thanks(?:\s*&\s*regards)?|regards|yours sincerely),?\s*$",
+        live,
+        maxsplit=1,
+    )[0]
 
-# The quoted-reply marker. Everything after this is history, not the current
-# message. Part C3 asks you to decide what that means for policy extraction.
-QUOTE_MARKER = re.compile(r"^\s*>", re.MULTILINE)
+
+def _plain_live_message(ticket: str) -> str:
+    text = html.unescape(_live_message(ticket))
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _detect_product(ticket: str) -> str:
+    text = ticket.lower()
+    for product in ("bronze", "silver", "gold", "platinum"):
+        if re.search(rf"\b(?:aurora\s+)?{product}\b", text):
+            return product
+    return "unknown"
+
+
+def _detect_language(ticket: str) -> str:
+    hindi_words = (
+        "kripya", "jaldi", "bahut", "turant", "koi", "batayiye", "nahi",
+        "hai", "ho", "mera", "meri", "please karo", "kar do",
+    )
+    text = ticket.lower()
+    return "hi-en" if any(re.search(rf"\b{re.escape(w)}\b", text) for w in hindi_words) else "en"
+
+
+def _heuristic_judgements(ticket: str) -> dict:
+    live = _plain_live_message(ticket)
+    text = live.lower()
+
+    if re.search(r"\b(mis-?sold|on hold|ignored grievance|service is a disgrace)\b", text):
+        category = "complaint"
+    elif re.search(r"\b(claim|cashless|reimbursement|settled|settlement|deduction|denied|hospital bill)\b", text):
+        category = "claims"
+    elif re.search(r"\b(premium|debit|debited|refund|invoice|80d|tax certificate|instalment|payment)\b", text):
+        category = "billing"
+    elif re.search(r"\b(add|remove|newborn|upgrade|portability|port\b|change.*(?:address|mobile|email|contact))\b", text):
+        category = "policy_change"
+    elif re.search(r"\b(app|portal|otp|login|upload|locator|crash|crashes|down|broken)\b", text):
+        category = "technical"
+    else:
+        category = "information"
+
+    urgency = 1
+    if re.search(r"\b(icu|emergency|cashless is denied|cashless denied|am filing.*ombudsman|filing a complaint with the ombudsman)\b", text):
+        urgency = 5
+    elif re.search(r"\b(third time|repeated|standing at the hospital|at the hospital desk|going to.*ombudsman|escalat|over an hour|twice today)\b", text):
+        urgency = 4
+    elif re.search(r"\b(heard nothing|debited twice|settled.*but|stuck|no response|not received|submitted .* days ago|delayed|nobody explained)\b", text):
+        urgency = 3
+    elif (
+        POLICY_RE.search(live)
+        or category in {"policy_change", "technical"}
+        or re.search(r"\b(my|me|currently have|please add|please change|refund|deduction|claim status)\b", text)
+    ):
+        urgency = 2
+
+    if urgency < 5 and re.search(r"\b(today|same day|tonight|tomorrow|next morning|by morning)\b", text):
+        urgency += 1
+
+    if re.search(r"\b(disgrace|unacceptable|ombudsman|mis-?sold|full refund|third time)\b", text) or re.search(r"[A-Z]{4,}", live):
+        sentiment = "angry"
+    elif re.search(r"\b(again|twice|heard nothing|still|stuck|delayed|nobody|not working|crashes|failed|failure)\b", text):
+        sentiment = "frustrated"
+    elif re.search(r"\b(thank you|thanks for|appreciate|great service|helpful)\b", text):
+        sentiment = "satisfied"
+    else:
+        sentiment = "neutral"
+
+    return {
+        "evidence": live[:200],
+        "category": category,
+        "urgency": urgency,
+        "sentiment": sentiment,
+    }
 
 
 def extract_deterministic(ticket: str) -> dict:
-    """TODO C1: return {'policy_number', 'contains_pii'} without a model call.
+    """Return deterministic fields without a model call."""
+    # General rule: choose the first policy in the live customer message only.
+    # Quoted lines are prior history, and signature tails are identity/contact
+    # material rather than the request being routed.
+    match = POLICY_RE.search(_live_message(ticket))
 
-    policy_number:
-        Find AUR-<7 digits>.
+    emails = [
+        m.group(0).lower()
+        for m in _PII_PATTERNS["EMAIL"].finditer(ticket)
+        if m.group(0).lower() not in OWN_EMAILS
+    ]
+    phones = list(_PII_PATTERNS["PHONE_IN"].finditer(ticket))
 
-    TODO C3 -- the trap. Some tickets contain TWO policy-number-shaped strings:
-        one in the live body, and one in a quoted reply below a '>' line from
-        an earlier thread. They are not always the same number.
-
-        Decide a rule. Write it down in a comment right here. Implement it.
-        Then ask yourself whether it generalises or whether you have fitted it
-        to this dataset -- the honest answer is worth marks.
-
-    contains_pii:
-        True if the ticket contains a phone number or an email address.
-        aip.guards._PII_PATTERNS has the patterns. Note that a *name* alone
-        does not count for this dataset's labels -- check the gold data and
-        say in your report whether you think that definition is right.
-    """
-    raise NotImplementedError
+    return {
+        "policy_number": match.group(0) if match else None,
+        "contains_pii": bool(emails or phones),
+        "product": _detect_product(ticket),
+        "language": _detect_language(ticket),
+    }
 
 
 def apply_business_rules(rec_fields: dict, ticket: str) -> dict:
-    """TODO C1b: compute `escalate` in code.
-
-        escalate = urgency >= 4 or 'ombudsman' appears in the ticket
-
-    This is a business rule. It belongs in code where it can be read by a
-    compliance officer, changed without touching a prompt, and unit-tested.
-    Write the unit test in tests/ while you are here.
-    """
-    raise NotImplementedError
+    """Compute auditable routing business rules."""
+    out = dict(rec_fields)
+    out["escalate"] = int(out.get("urgency", 1)) >= 4 or "ombudsman" in ticket.lower()
+    return out
 
 
 class TicketRecordC(BaseModel):
-    """TODO C2: the reduced schema the model sees in Part C.
+    """Part C schema: the model only handles judgement fields."""
 
-    Copy TicketRecord and delete the fields you now compute in code. Fewer
-    fields means a shorter prompt, fewer output tokens, and three fields at
-    100% accuracy. Measure all three effects.
-    """
+    # Evidence still comes first so category is selected after grounding.
+    evidence: str = Field(
+        max_length=200,
+        description="Quote the shortest verbatim span that determines category.",
+    )
+    category: CATEGORIES = Field(description=CATEGORY_DESCRIPTION)
+    urgency: int = Field(ge=1, le=5, description=URGENCY_DESCRIPTION)
+    sentiment: Literal["angry", "frustrated", "neutral", "satisfied"] = Field(
+        description=SENTIMENT_DESCRIPTION
+    )
+    needs_human_review: bool = False
+    review_reason: str = ""
+
+
+def _fallback_c(ticket: str, reason: str) -> dict:
+    return {
+        **_heuristic_judgements(ticket),
+        "needs_human_review": True,
+        "review_reason": reason[:200],
+    }
 
 
 def extract_c(ticket: str) -> dict:
-    """Part C: model for judgement, code for everything else.
+    """Part C: model for judgement, code for deterministic fields and rules."""
+    deterministic = extract_deterministic(ticket)
+    try:
+        model_rec = structured(
+            f"Ticket:\n{ticket}",
+            schema=TicketRecordC,
+            system=SYSTEM_PROMPT,
+            tier="SMALL",
+            temperature=0.0,
+            max_tokens=700,
+        ).model_dump()
+    except (StructuredOutputError, Exception) as exc:
+        model_rec = _fallback_c(ticket, str(exc))
 
-    Returns a plain dict (model fields + deterministic fields + business rules)
-    so that run_eval.py can score it against the gold labels directly.
-    """
-    raise NotImplementedError
+    return apply_business_rules({**model_rec, **deterministic}, ticket)
 
 
 if __name__ == "__main__":

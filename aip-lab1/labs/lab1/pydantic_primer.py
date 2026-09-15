@@ -67,8 +67,8 @@ It is a validator, not a type checker.
 
 class Ticket1(BaseModel):
     # TODO 1: give this model two fields:
-    #   ticket_id : str
-    #   urgency   : int
+    ticket_id : str
+    urgency   : int
     pass
 
 
@@ -102,7 +102,8 @@ validation error you can see and repair, not a mystery three services later.
 class Ticket2(BaseModel):
     # TODO 2: urgency must be an int between 1 and 5 inclusive.
     #         evidence must be a str of at most 200 characters.
-    pass
+    urgency: int = Field(ge=1, le=5)
+    evidence: str = Field(max_length=200)
 
 
 def _t2():
@@ -139,7 +140,7 @@ CATEGORIES = Literal["billing", "claims", "policy_change",
 
 class Ticket3(BaseModel):
     # TODO 3: a `category` field constrained to CATEGORIES above.
-    pass
+    category: CATEGORIES
 
 
 def _t3():
@@ -171,7 +172,10 @@ identifier is the one error a human reviewer will never catch.
 class Ticket4(BaseModel):
     # TODO 4: policy_number, optional, defaulting to None, and when present it
     #         must match exactly: AUR- followed by exactly 7 digits.
-    pass
+    policy_number: str | None = Field(
+        default=None,
+        pattern=r"^AUR-\d{7}$"
+    )
 
 
 def _t4():
@@ -205,7 +209,15 @@ class Ticket5(BaseModel):
     #         scale concretely. It must mention BOTH the word "urgency" and the
     #         digit "5" -- because "how urgent it is" tells the model nothing
     #         and it will invent its own scale.
-    pass
+    urgency: int = Field(
+        ge=1,
+        le=5,
+        description=(
+            "Urgency 1-5. 5 = an emergency in progress or a hard same-day "
+            "deadline. 3 = something is already stuck and the customer is "
+            "waiting. 1 = a general question."
+        )
+    )
 
 
 def _t5():
@@ -242,6 +254,15 @@ class Ticket6(BaseModel):
     # TODO 6: add a `mode="before"` validator on policy_number that converts
     #         "", "null", "none", "n/a" (any capitalisation, any surrounding
     #         whitespace) into None, and strips whitespace from anything else.
+    @field_validator("policy_number", mode="before")
+    @classmethod
+    def _clean(cls, v):
+        if v is None:
+            return None
+
+        v = str(v).strip()
+
+        return None if v.lower() in {"", "null", "none", "n/a"} else v
 
 
 def _t6():
@@ -277,7 +298,11 @@ def failing_fields(payload: dict) -> list[str]:
     Hint: catch ValidationError and read e.errors(); each entry has a 'loc'
     tuple whose first element is the field name.
     """
-    raise NotImplementedError
+    try:
+        Ticket7.model_validate(payload)
+        return []
+    except ValidationError as e:
+        return sorted({str(err["loc"][0]) for err in e.errors()})
 
 
 def _t7():
@@ -307,7 +332,52 @@ class TicketRecord(BaseModel):
     #   urgency       int 1-5, with a description
     #   policy_number str | None = None, pattern ^AUR-\d{7}$, with a description
     #                 and the same "before" validator from exercise 6
-    pass
+    evidence: str = Field(
+        max_length=200,
+        description=(
+            "The span of the ticket that determined the category, "
+            "quoted verbatim. One sentence at most."
+        )
+    )
+
+    category: CATEGORIES = Field(
+        description=(
+            "billing = money in. claims = an actual or intended claim. "
+            "policy_change = altering the contract. "
+            "technical = the app or portal is broken. complaint = "
+            "Aurora's conduct is the subject. information = a "
+            "question with no pending transaction."
+        )
+    )
+
+    urgency: int = Field(
+        ge=1,
+        le=5,
+        description=(
+            "Urgency 1-5. 5 = emergency in progress or a same-day "
+            "deadline. 1 = a general question, nothing at stake."
+        )
+    )
+
+    policy_number: str | None = Field(
+        default=None,
+        pattern=r"^AUR-\d{7}$",
+        description=(
+            "Format AUR- followed by exactly 7 digits, copied "
+            "character for character. null if the ticket contains "
+            "no such string. Never invent or reformat one."
+        )
+    )
+
+    @field_validator("policy_number", mode="before")
+    @classmethod
+    def _clean(cls, v):
+        if v is None:
+            return None
+
+        v = str(v).strip()
+
+        return None if v.lower() in {"", "null", "none", "n/a"} else v
 
 
 def _t8():

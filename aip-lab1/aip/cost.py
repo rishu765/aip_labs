@@ -88,6 +88,7 @@ class Budget:
     limit_usd: float = 1.0
     label: str = "unnamed"
     spent_usd: float = 0.0
+    estimated_cost_usd: float = 0.0  # deployment price, including cached calls
     calls: int = 0
     cached_calls: int = 0
     unpriced_calls: int = 0
@@ -102,13 +103,15 @@ class Budget:
             self.calls += 1
             if usage.cached:
                 self.cached_calls += 1
-            if not usage.priced:
+            if not is_priced(usage.model):
                 self.unpriced_calls += 1
                 if usage.model:
                     self.unpriced_models.add(usage.model)
             self.prompt_tokens += usage.prompt_tokens
             self.completion_tokens += usage.completion_tokens
             self.spent_usd += usage.cost_usd
+            self.estimated_cost_usd += price_of(
+                usage.model, usage.prompt_tokens, usage.completion_tokens)
             self.latencies_ms.append(usage.latency_ms)
         if self.spent_usd > self.limit_usd:
             raise BudgetExceeded(
@@ -147,6 +150,7 @@ class Budget:
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "cost_usd": round(self.spent_usd, 6),
+            "estimated_cost_usd": round(self.estimated_cost_usd, 6),
             "unpriced_calls": self.unpriced_calls,
             "unpriced_models": sorted(self.unpriced_models),
             "latency_p50_ms": round(self.percentile(50), 1),

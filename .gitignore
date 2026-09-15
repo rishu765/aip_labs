@@ -1,0 +1,37 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments and generated files
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Local model state and logs
+.aip_cache/
+.aip_traces/
+.chroma/
+*.sqlite3
+*.db
+*.log
+
+# Submission archives and OS/editor files
+*.zip
+*.tar.gz
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
