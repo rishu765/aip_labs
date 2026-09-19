@@ -13,6 +13,7 @@ model is not the bottleneck. Your chunking is.
 from __future__ import annotations
 
 import base64
+import re
 import time
 from functools import lru_cache
 
@@ -56,13 +57,29 @@ def _embed_uncached(texts: list[str], model: str,
     kwargs = {"model": model, "input": texts, "timeout": settings.timeout_s}
     if _supports_input_type(model):
         kwargs["input_type"] = input_type
-    resp = embedding(**kwargs)
+
+    resp = None
+    for attempt in range(5):
+        try:
+            resp = embedding(**kwargs)
+            break
+        except Exception as exc:
+            err_str = str(exc).lower()
+            if ("429" in err_str or "ratelimit" in err_str or "resource_exhausted" in err_str) and attempt < 4:
+                m = re.search(r"retry in (\d+(?:\.\d+)?)s", err_str)
+                delay = (float(m.group(1)) + 2.0) if m else (15.0 * (attempt + 1))
+                print(f"  [rate limit 429] waiting {delay:.1f}s before retry ({attempt + 1}/4)...")
+                time.sleep(delay)
+            else:
+                raise
+
     pt = int(getattr(resp.usage, "prompt_tokens", 0) or 0)
     cost.record(
         cost.Usage(model, pt, 0, cost.price_of(model, pt, 0), 0.0, cached=False,
                    calls=1, priced=cost.is_priced(model))
     )
     return [d["embedding"] for d in resp.data]
+
 
 
 def _pack(vec) -> dict:

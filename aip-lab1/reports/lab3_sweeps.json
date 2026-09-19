@@ -1,0 +1,238 @@
+{
+  "dataset": {
+    "corpus_docs": 30,
+    "eval_questions_total": 45,
+    "eval_questions_evaluated": 42,
+    "excluded_questions": ["Q36", "Q38", "Q39"],
+    "exclusion_reason": "Zero relevant documents in golden set (unanswerable), making recall and nDCG mathematically undefined"
+  },
+  "step_0_baseline": {
+    "config": "sliding-800 dense",
+    "hit_rate@1": 0.7857,
+    "hit_rate@5": 0.9286,
+    "recall@5": 0.8452,
+    "mrr": 0.8451,
+    "ndcg@10": 0.8053,
+    "latency_p95_ms": 1.3444,
+    "n_chunks": 91
+  },
+  "part_a1_chunking_strategies_800": {
+    "fixed-800": {
+      "hit_rate@1": 0.7381,
+      "hit_rate@5": 0.9524,
+      "recall@5": 0.8373,
+      "mrr": 0.8387,
+      "ndcg@10": 0.7952,
+      "n_chunks": 83
+    },
+    "sliding-800": {
+      "hit_rate@1": 0.7857,
+      "hit_rate@5": 0.9286,
+      "recall@5": 0.8452,
+      "mrr": 0.8451,
+      "ndcg@10": 0.8053,
+      "n_chunks": 91
+    },
+    "recursive-800": {
+      "hit_rate@1": 0.7619,
+      "hit_rate@5": 0.9524,
+      "recall@5": 0.8750,
+      "mrr": 0.8611,
+      "ndcg@10": 0.8251,
+      "n_chunks": 98
+    },
+    "markdown-800": {
+      "hit_rate@1": 0.7619,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.8988,
+      "mrr": 0.8720,
+      "ndcg@10": 0.8458,
+      "n_chunks": 164
+    }
+  },
+  "part_a2_chunk_size_sweep": {
+    "markdown-400": {
+      "hit_rate@1": 0.7857,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.9028,
+      "mrr": 0.8800,
+      "ndcg@10": 0.8527,
+      "n_chunks": 235
+    },
+    "markdown-800": {
+      "hit_rate@1": 0.7619,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.8988,
+      "mrr": 0.8720,
+      "ndcg@10": 0.8458,
+      "n_chunks": 164
+    },
+    "markdown-1600": {
+      "hit_rate@1": 0.7143,
+      "hit_rate@5": 0.9524,
+      "recall@5": 0.8750,
+      "mrr": 0.8262,
+      "ndcg@10": 0.8075,
+      "n_chunks": 150
+    }
+  },
+  "part_a3_heading_path_prefix": {
+    "markdown-800_with_prefix": {
+      "hit_rate@1": 0.7619,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.8988,
+      "mrr": 0.8720,
+      "ndcg@10": 0.8458
+    },
+    "markdown-800_no_prefix": {
+      "hit_rate@1": 0.6190,
+      "hit_rate@5": 1.0000,
+      "recall@5": 0.9048,
+      "mrr": 0.7837,
+      "ndcg@10": 0.7915
+    },
+    "delta_hit_rate@1": 0.1429,
+    "delta_ndcg@10": 0.0543
+  },
+  "part_a4_failure_case": {
+    "question_id": "Q08",
+    "question": "Can I claim for IVF treatment?",
+    "relevant_docs": ["exclusions"],
+    "fixed-800_rank": 0,
+    "fixed-800_hit_rate@5": 0.0,
+    "markdown-400_rank": 1,
+    "markdown-400_score": 0.6890,
+    "mechanism": "Failure Mode 2: Fixed chunking split exclusions across arbitrary character offsets without heading context, diluting similarity; Markdown preserved section boundaries and breadcrumb"
+  },
+  "part_b1_retrieval_comparison": {
+    "dense": {
+      "hit_rate@1": 0.7857,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.9028,
+      "mrr": 0.8800,
+      "ndcg@10": 0.8527,
+      "latency_p95_ms": 3.46
+    },
+    "bm25": {
+      "hit_rate@1": 0.4762,
+      "hit_rate@5": 0.9286,
+      "recall@5": 0.7956,
+      "mrr": 0.6698,
+      "ndcg@10": 0.6978,
+      "latency_p95_ms": 2.92
+    },
+    "hybrid_rrf60": {
+      "hit_rate@1": 0.6667,
+      "hit_rate@5": 0.9762,
+      "recall@5": 0.8631,
+      "mrr": 0.7976,
+      "ndcg@10": 0.7949,
+      "latency_p95_ms": 6.32
+    }
+  },
+  "part_b2_case_studies": {
+    "Q44_exact_code": {
+      "type": "exact identifier",
+      "dense_mrr": 0.5000,
+      "bm25_mrr": 1.0000,
+      "hybrid_mrr": 1.0000
+    },
+    "Q41_paraphrase": {
+      "type": "grace period paraphrase",
+      "dense_mrr": 1.0000,
+      "bm25_mrr": 0.0000,
+      "hybrid_mrr": 0.2500
+    }
+  },
+  "part_b3_rrf_k_tuning": {
+    "k10": { "hit_rate@1": 0.6667, "hit_rate@5": 1.0000, "recall@5": 0.8849, "mrr": 0.8115, "ndcg@10": 0.8156 },
+    "k30": { "hit_rate@1": 0.6667, "hit_rate@5": 0.9762, "recall@5": 0.8631, "mrr": 0.7976, "ndcg@10": 0.7949 },
+    "k60": { "hit_rate@1": 0.6667, "hit_rate@5": 0.9762, "recall@5": 0.8631, "mrr": 0.7976, "ndcg@10": 0.7949 },
+    "k100": { "hit_rate@1": 0.6667, "hit_rate@5": 0.9762, "recall@5": 0.8631, "mrr": 0.7976, "ndcg@10": 0.7901 }
+  },
+  "part_b4_fusion_weights": {
+    "dense_alone": { "hit_rate@1": 0.7857, "ndcg@10": 0.8527 },
+    "hybrid_1_1": { "hit_rate@1": 0.6667, "ndcg@10": 0.7949 },
+    "hybrid_2_1": { "hit_rate@1": 0.6905, "ndcg@10": 0.8068 },
+    "hybrid_3_1": { "hit_rate@1": 0.6905, "ndcg@10": 0.8136 },
+    "hybrid_1_2": { "hit_rate@1": 0.7143, "ndcg@10": 0.7926 }
+  },
+  "part_c_reranking": {
+    "dense_k5": {
+      "ndcg@5": 0.8313,
+      "hit_rate@1": 0.7857,
+      "latency_p95_ms": 1.71,
+      "cost_per_1k": "$0.00"
+    },
+    "cross_encoder_k30_to_5": {
+      "ndcg@5": 0.8174,
+      "hit_rate@1": 0.7619,
+      "latency_p95_ms": 1459.24,
+      "cost_per_1k": "$0.00",
+      "delta_ndcg@5": -0.0139
+    },
+    "llm_reranker_k30_to_5": {
+      "ndcg@5": 0.8600,
+      "hit_rate@1": 0.8095,
+      "latency_p95_ms": 28000.0,
+      "cost_per_1k": "$1.50"
+    },
+    "degraded_query_c4": {
+      "id": "Q01",
+      "question": "How many days do I have to submit a reimbursement claim after discharge?",
+      "dense_mrr": 1.0000,
+      "cross_encoder_mrr": 0.5000
+    }
+  },
+  "part_d_index_and_metadata": {
+    "d1_quality_gap": {
+      "dense_exact": { "hit_rate@1": 0.7857, "ndcg@10": 0.8527, "recall@5": 0.9028, "mrr": 0.8800 },
+      "chroma_hnsw": { "hit_rate@1": 0.7857, "ndcg@10": 0.8527, "recall@5": 0.9028, "mrr": 0.8800 },
+      "quality_gap": 0.0
+    },
+    "d2_crossover": {
+      "small_scale_235_chunks": { "exact_blas_ms": 0.8, "hnsw_ms": 6.6, "winner": "Exact NumPy" },
+      "medium_scale_4000_chunks": { "exact_blas_ms": 1.85, "hnsw_ms": 1.42, "winner": "Crossover (~4k chunks)" },
+      "large_scale_40000_chunks": { "exact_blas_ms": 18.2, "hnsw_ms": 2.1, "winner": "HNSW (8.6x faster)" }
+    },
+    "d3_trap_questions": {
+      "target_questions": ["Q29", "Q30", "Q31"],
+      "before_filter_hit_rate@1": 0.6667,
+      "after_filter_hit_rate@1": 1.0000,
+      "delta_hit_rate@1": 0.3333
+    }
+  },
+  "final_recommended_configuration": {
+    "interactive_search_box": {
+      "chunking": "markdown-aware",
+      "chunk_size": 400,
+      "heading_prefix": true,
+      "retrieval": "DenseRetriever (exact BLAS cosine)",
+      "reranking": "none",
+      "metadata_filter": "status == 'current'",
+      "metrics": {
+        "nDCG@10": 0.8527,
+        "hit_rate@1": 0.7857,
+        "recall@5": 0.9028,
+        "MRR": 0.8800,
+        "latency_p95_ms": 1.71,
+        "cost_per_1k": "$0.00"
+      }
+    },
+    "overnight_batch_job": {
+      "chunking": "markdown-aware",
+      "chunk_size": 400,
+      "heading_prefix": true,
+      "retrieval": "DenseRetriever (k=30)",
+      "reranking": "LLMReranker (tier=SMALL, k=30->5)",
+      "metadata_filter": "status == 'current'",
+      "metrics": {
+        "nDCG@5": 0.8600,
+        "hit_rate@1": 0.8095,
+        "latency_p95_ms": 28000.0,
+        "cost_per_1k": "$1.50"
+      }
+    }
+  }
+}
+
