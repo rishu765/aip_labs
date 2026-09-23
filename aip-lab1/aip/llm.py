@@ -151,6 +151,13 @@ def raw_call(
                 # Exponential backoff with full jitter — the standard fix for
                 # a fleet of 27 students hitting one rate limit at once.
                 sleep_s = min(30.0, (2 ** attempt)) * random.random()
+                # Exponential backoff with rate-limit awareness
+                m = re.search(r"retry in (\d+(?:\.\d+)?)s", str(exc), re.I)
+                if m:
+                    sleep_s = float(m.group(1)) + 2.0
+                    print(f"  [rate limit 429] waiting {sleep_s:.1f}s before retry ({attempt + 1}/{settings.max_retries})...")
+                else:
+                    sleep_s = min(30.0, (2 ** attempt)) * random.random()
                 tracing.event("llm.retry", attempt=attempt + 1, sleep_s=round(sleep_s, 2),
                               error=type(exc).__name__)
                 time.sleep(sleep_s)

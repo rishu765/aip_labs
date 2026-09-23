@@ -73,9 +73,9 @@ PROFILES: dict[str, dict[str, str]] = {
     # thinking:disabled is ignored). 3.5-flash-lite spends none. So the
     # high-volume tier is flash-lite and the reasoning tier is 3.7-flash.
     "gemini": {  # generous free tier -- the recommended profile for this module
-        "SMALL": "gemini/gemini-3.5-flash-lite",   # 10 out tok, ~850 ms, no thinking
-        "MAIN": "gemini/gemini-3.7-flash",         # reasoning model, ~220 think tok
-        "LARGE": "gemini/gemini-3.5-flash",        # judge: a DIFFERENT family from MAIN
+        "SMALL": "gemini/gemini-3.5-flash-lite",   # fast, lightweight
+        "MAIN": "gemini/gemini-3.5-flash-lite",    # high quota, fast (~850ms), no thinking overhead
+        "LARGE": "gemini/gemini-3.5-flash-lite",   # judge model with stable quota
         "EMBED": "gemini/gemini-embedding-001",    # 3072-dim
     },
     # VERIFIED WORKING 2026-08-26 against an NVIDIA developer key.
