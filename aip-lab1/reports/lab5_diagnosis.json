@@ -1,0 +1,47 @@
+[
+  {
+    "id": "Q04",
+    "kind": "single_hop",
+    "mode": 6,
+    "mode_name": "generation",
+    "evidence": "gold context did not fix the answer (generation failure)",
+    "question": "What is the waiting period for pre-existing diseases?",
+    "answer": "The waiting period for pre-existing diseases is 36 months on retail plans, unless Aurora explicitly waives it in writing on the policy schedule [3]. For the Aurora Senior Care plan (ages 60 and above), the waiting period for pre-existing diseases is shorter at 24 months [5]."
+  },
+  {
+    "id": "Q23",
+    "kind": "multi_hop",
+    "mode": 4,
+    "mode_name": "ranking",
+    "evidence": "relevant content in top 30, but ranked outside final k (ranking failure)",
+    "question": "Can I get an out-patient physiotherapy session reimbursed on Bronze?",
+    "answer": "I don't have enough information in the provided sources to answer that."
+  },
+  {
+    "id": "Q29",
+    "kind": "trap_archived",
+    "mode": 4,
+    "mode_name": "ranking",
+    "evidence": "relevant content in top 30, but ranked outside final k (ranking failure)",
+    "question": "How many days do I have to respond to a query Aurora raises on my claim?",
+    "answer": "You have 45 days from the date of the query to respond to an Aurora query regarding a claim [2][5]. However, for motor insurance claims, the deadline to respond to an Aurora query is 30 days from the date of the query [4]."
+  },
+  {
+    "id": "Q32",
+    "kind": "aggregation",
+    "mode": 4,
+    "mode_name": "ranking",
+    "evidence": "relevant content in top 30, but ranked outside final k (ranking failure)",
+    "question": "Which plans have no co-payment?",
+    "answer": "Based on the provided sources, the Aurora Gold plan has no co-payment at all ages [1][4]. Additionally, the Aurora Silver and Bronze plans have no co-payment for insured members below the age of 60 [2][5]."
+  },
+  {
+    "id": "Q44",
+    "kind": "paraphrase",
+    "mode": 4,
+    "mode_name": "ranking",
+    "evidence": "relevant content in top 30, but ranked outside final k (ranking failure)",
+    "question": "AUR-HI-SIL-2026 — what are the sum insured options?",
+    "answer": "I don't have enough information in the provided sources to answer that."
+  }
+]
