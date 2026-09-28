@@ -22,9 +22,13 @@ dist/
 
 # Local model state and logs
 .aip_cache/
+!.aip_cache/calls.sqlite3
 .aip_traces/
 .chroma/
 *.sqlite3
+!*.sqlite3
+.aip_cache/*
+!.aip_cache/calls.sqlite3
 *.db
 *.log
 
