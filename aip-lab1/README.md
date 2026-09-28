@@ -113,3 +113,37 @@ the Word syllabus stay reviewable in a diff and cannot drift from the Markdown.
 
 Everything in `aip/` is under 250 lines per module and is meant to be read.
 There is no framework hiding the interesting parts.
+
+---
+
+## Lab 7: Production Service Quickstart (< 5 minutes)
+
+To run the full production system built in Lab 7:
+
+1. **Start the API Service:**
+   ```bash
+   uvicorn labs.lab7.service:app --port 8000
+   ```
+   Endpoints: `POST /ask`, `POST /ask/stream`, `GET /health`, `GET /metrics`.
+
+2. **Launch the User UI (Streamlit):**
+   ```bash
+   streamlit run labs/lab7/ui.py
+   ```
+   Interactive interface with expandable citation grounding, mode switching (RAG vs Tools), SSE streaming, and a human review feedback loop.
+
+3. **Launch the Ops & Alerting Dashboard:**
+   ```bash
+   streamlit run labs/lab7/dashboard.py
+   ```
+   Reads local traces from `.aip_traces/`, graphs latency by stage, cumulative cost, and monitors refusal rate / p95 latency alert conditions with runbook action guides.
+
+4. **Run the Automated Regression Gate (Zero-Cost Offline):**
+   ```bash
+   python labs/lab7/gate.py --config labs/lab7/thresholds.yml
+   ```
+   Evaluates all 45 golden benchmark questions against calibrated quality and cost gates in ~3 seconds under `AIP_OFFLINE=1`.
+
+5. **Capstone Evaluation Report:**
+   Read the complete 7-section report at [`labs/lab7/report.md`](labs/lab7/report.md).
+
